@@ -22,6 +22,26 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), { status
 const ok = (id, result) => ({ jsonrpc: "2.0", id, result });
 const err = (id, code, message) => ({ jsonrpc: "2.0", id, error: { code, message } });
 
+// Kalshi rate-limits busy shared IPs, so: a real User-Agent, a short edge cache (several viewers share one fetch),
+// and up to two retries after a 429, honouring Retry-After.
+const UA = { accept: "application/json", "user-agent": "kalshi-market-data-worker/1.1 (read-only public market data)" };
+const ttlFor = path => /\/orderbook/.test(path) ? 2 : /\/candlesticks/.test(path) ? 30 : 5;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+export async function kalshiFetch(path, fetchImpl = fetch, cache = globalThis.caches && globalThis.caches.default) {
+  const url = KAPI + path, key = new Request(url);
+  if (cache) { const hit = await cache.match(key); if (hit) return { status: hit.status, ok: hit.ok, text: await hit.text(), cached: true }; }
+  let r;
+  for (let i = 0; i < 3; i++) {
+    r = await fetchImpl(url, { headers: UA });
+    if (r.status !== 429 || i === 2) break;
+    const ra = Number(r.headers && r.headers.get && r.headers.get("retry-after"));
+    await sleep(Math.min(3000, ra > 0 ? ra * 1000 : 600 * (i + 1)));
+  }
+  const text = await r.text();
+  if (r.ok && cache) await cache.put(key, new Response(text, { headers: { "content-type": "application/json", "cache-control": `public, max-age=${ttlFor(path)}` } }));
+  return { status: r.status, ok: r.ok, text, cached: false };
+}
+
 async function call(msg, fetchImpl) {
   const { id, method, params } = msg || {};
   if (method === "initialize") return ok(id, { protocolVersion: (params && params.protocolVersion) || "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "kalshi-market-data", version: "1.0.0" } });
@@ -32,11 +52,10 @@ async function call(msg, fetchImpl) {
     const path = params.arguments && params.arguments.path;
     if (!allowed(path)) return ok(id, { isError: true, content: [{ type: "text", text: "path not allowed: only public market data reads" }] });
     const t0 = Date.now();
-    const r = await fetchImpl(KAPI + path, { headers: { accept: "application/json" } });
-    const text = await r.text();
+    const r = await kalshiFetch(path, fetchImpl), text = r.text;
     if (!r.ok) return ok(id, { isError: true, content: [{ type: "text", text: `Kalshi HTTP ${r.status}: ${text.slice(0, 300)}` }] });
     let data; try { data = JSON.parse(text); } catch { return ok(id, { isError: true, content: [{ type: "text", text: "Kalshi returned non-JSON" }] }); }
-    const meta = { fetchedAt: new Date().toISOString(), ms: Date.now() - t0, source: KAPI + path };
+    const meta = { fetchedAt: new Date().toISOString(), ms: Date.now() - t0, source: KAPI + path, cached: r.cached };
     return ok(id, { content: [{ type: "text", text }], structuredContent: { ...data, _meta_kalshi: meta } });
   }
   if (id === undefined) return null; // notifications (e.g. notifications/initialized) get no response
@@ -46,8 +65,8 @@ async function call(msg, fetchImpl) {
 export async function handle(request, fetchImpl = fetch) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (request.method === "GET") { // opening the URL in a browser shows a live Kalshi test
-    const r = await fetchImpl(KAPI + "/markets?series_ticker=KXBTCD&status=open&limit=3", { headers: { accept: "application/json" } });
-    return new Response("kalshi-market-data is running. Kalshi test: HTTP " + r.status + "\n" + (await r.text()).slice(0, 600), { headers: { "content-type": "text/plain", ...cors } });
+    const r = await kalshiFetch("/markets?series_ticker=KXBTCD&status=open&limit=3", fetchImpl);
+    return new Response("kalshi-market-data is running. Kalshi test: HTTP " + r.status + (r.cached ? " (cached)" : "") + "\n" + r.text.slice(0, 600), { headers: { "content-type": "text/plain", ...cors } });
   }
   if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
   let body; try { body = await request.json(); } catch { return json(err(null, -32700, "parse error"), 400); }

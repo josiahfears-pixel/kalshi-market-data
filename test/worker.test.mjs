@@ -23,3 +23,13 @@ test("errors are reported, never replaced with data", async () => {
   const b = await (await handle(post({ jsonrpc: "2.0", id: 5, method: "tools/call", params: { name: "kalshi_get", arguments: { path: "/portfolio/orders" } } }), () => { throw new Error("must not fetch"); })).json();
   assert.equal(b.result.isError, true);
 });
+test("retries after Kalshi's 429 and then returns the real answer", async () => {
+  let n = 0; const f = async () => (++n < 2 ? new Response('{"error":"too_many_requests"}', { status: 429, headers: { "retry-after": "0" } }) : new Response('{"market":{"ticker":"T2"}}', { status: 200 }));
+  const r = await (await handle(post({ jsonrpc: "2.0", id: 6, method: "tools/call", params: { name: "kalshi_get", arguments: { path: "/markets/T2" } } }), f)).json();
+  assert.equal(n, 2); assert.equal(r.result.structuredContent.market.ticker, "T2");
+});
+test("gives up after three 429s and reports it", async () => {
+  let n = 0; const f = async () => { n++; return new Response("{}", { status: 429, headers: { "retry-after": "0" } }); };
+  const r = await (await handle(post({ jsonrpc: "2.0", id: 7, method: "tools/call", params: { name: "kalshi_get", arguments: { path: "/markets/T3" } } }), f)).json();
+  assert.equal(n, 3); assert.equal(r.result.isError, true); assert.match(r.result.content[0].text, /429/);
+});
