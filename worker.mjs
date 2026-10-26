@@ -6,6 +6,7 @@ const ALLOW = [
   /^\/markets(\?[^#]*)?$/,
   /^\/markets\/[A-Z0-9.\-]+(\?[^#]*)?$/,
   /^\/markets\/[A-Z0-9.\-]+\/orderbook(\?[^#]*)?$/,
+  /^\/markets\/trades(\?[^#]*)?$/,
   /^\/events\/[A-Z0-9.\-]+(\?[^#]*)?$/,
   /^\/series\/[A-Z0-9.\-]+(\?[^#]*)?$/,
   /^\/series\/[A-Z0-9.\-]+\/markets\/[A-Z0-9.\-]+\/candlesticks(\?[^#]*)?$/,
@@ -44,7 +45,7 @@ export async function kalshiFetch(path, fetchImpl = fetch, cache = globalThis.ca
 
 async function call(msg, fetchImpl) {
   const { id, method, params } = msg || {};
-  if (method === "initialize") return ok(id, { protocolVersion: (params && params.protocolVersion) || "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "kalshi-market-data", version: "1.0.0" } });
+  if (method === "initialize") return ok(id, { protocolVersion: (params && params.protocolVersion) || "2025-06-18", capabilities: { tools: {} }, serverInfo: { name: "kalshi-market-data", version: "1.3.0" } });
   if (method === "ping") return ok(id, {});
   if (method === "tools/list") return ok(id, { tools: [TOOL] });
   if (method === "tools/call") {
@@ -66,7 +67,7 @@ export async function handle(request, fetchImpl = fetch) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (request.method === "GET") { // opening the URL in a browser shows a live Kalshi test
     const r = await kalshiFetch("/markets?series_ticker=KXBTCD&status=open&limit=3", fetchImpl);
-    return new Response("kalshi-market-data v1.2 is running" + (globalThis.caches && globalThis.caches.default ? " on Cloudflare" : " on Vercel") + ". Kalshi test: HTTP " + r.status + (r.cached ? " (cached)" : "") + "\n" + r.text.slice(0, 600), { headers: { "content-type": "text/plain", ...cors } });
+    return new Response("kalshi-market-data v1.3 is running" + (globalThis.caches && globalThis.caches.default ? " on Cloudflare" : " on Vercel") + ". Kalshi test: HTTP " + r.status + (r.cached ? " (cached)" : "") + "\n" + r.text.slice(0, 600), { headers: { "content-type": "text/plain", ...cors } });
   }
   if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
   let body; try { body = await request.json(); } catch { return json(err(null, -32700, "parse error"), 400); }

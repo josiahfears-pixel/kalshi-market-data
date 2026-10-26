@@ -9,7 +9,7 @@ test("initialize and tools/list", async () => {
   assert.equal((await handle(post({ jsonrpc: "2.0", method: "notifications/initialized" }))).status, 202);
 });
 test("only public read paths are allowed", () => {
-  for (const p of ["/markets?series_ticker=KXBTCD&status=open&limit=1000", "/markets/KXBTCD-26OCT2603-T80299.99", "/markets/KXBTCD-26OCT2603-T80299.99/orderbook", "/series/KXBTCD/markets/KXBTCD-26OCT2603-T80299.99/candlesticks?start_ts=1&end_ts=2&period_interval=1"]) assert.ok(allowed(p), p);
+  for (const p of ["/markets?series_ticker=KXBTCD&status=open&limit=1000", "/markets/KXBTCD-26OCT2603-T80299.99", "/markets/KXBTCD-26OCT2603-T80299.99/orderbook", "/series/KXBTCD/markets/KXBTCD-26OCT2603-T80299.99/candlesticks?start_ts=1&end_ts=2&period_interval=1", "/markets/trades?ticker=KXBTC15M-26OCT260400-00&limit=20", "/markets?series_ticker=KXBTC15M&status=open"]) assert.ok(allowed(p), p);
   for (const p of ["/portfolio/orders", "/portfolio/balance", "/markets/../portfolio", "https://evil", "", null]) assert.ok(!allowed(p), String(p));
 });
 test("tools/call passes Kalshi's JSON through and only calls Kalshi's API host", async () => {

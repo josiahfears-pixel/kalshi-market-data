@@ -13,3 +13,12 @@ secrets, and it cannot place orders: any path outside the read-only allow list i
    which Kalshi route is working.
 
 Tests: `node --test test/worker.test.mjs` (fake Kalshi responses; they check the protocol, the allow list and error handling).
+
+## Deploy on Vercel instead (if Cloudflare gets HTTP 429 from Kalshi)
+Kalshi rate-limits some shared Cloudflare addresses. The same handler runs on Vercel (`api/mcp.mjs`, with `/` rewritten to it):
+1. Open https://vercel.com/new/clone?repository-url=https://github.com/josiahfears-pixel/kalshi-market-data and deploy.
+2. Open the deployed URL. It should say `kalshi-market-data v1.3 is running on Vercel. Kalshi test: HTTP 200`.
+3. In claude.ai, Settings > Connectors: remove the old Kalshi Market Data connector, then add a custom connector named
+   exactly **Kalshi Market Data** with the Vercel URL.
+
+v1.3 also allows `/markets/trades` (recent trades) for the 15-minute picker.
