@@ -1,0 +1,3 @@
+name = "kalshi-market-data"
+main = "worker.mjs"
+compatibility_date = "2025-06-01"

@@ -1,0 +1,7 @@
+{
+  "name": "kalshi-market-data",
+  "private": true,
+  "type": "module",
+  "scripts": { "deploy": "wrangler deploy", "test": "node --test test/worker.test.mjs" },
+  "devDependencies": { "wrangler": "^4" }
+}
