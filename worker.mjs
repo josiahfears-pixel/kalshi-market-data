@@ -66,7 +66,7 @@ export async function handle(request, fetchImpl = fetch) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
   if (request.method === "GET") { // opening the URL in a browser shows a live Kalshi test
     const r = await kalshiFetch("/markets?series_ticker=KXBTCD&status=open&limit=3", fetchImpl);
-    return new Response("kalshi-market-data is running. Kalshi test: HTTP " + r.status + (r.cached ? " (cached)" : "") + "\n" + r.text.slice(0, 600), { headers: { "content-type": "text/plain", ...cors } });
+    return new Response("kalshi-market-data v1.2 is running" + (globalThis.caches && globalThis.caches.default ? " on Cloudflare" : " on Vercel") + ". Kalshi test: HTTP " + r.status + (r.cached ? " (cached)" : "") + "\n" + r.text.slice(0, 600), { headers: { "content-type": "text/plain", ...cors } });
   }
   if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
   let body; try { body = await request.json(); } catch { return json(err(null, -32700, "parse error"), 400); }
